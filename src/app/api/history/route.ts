@@ -18,8 +18,8 @@ export async function GET(req: Request) {
   let idx = 0;
 
   for (const block of blocks) {
-    const userMatch = block.match(/^## User\n([\s\S]+)/);
-    const assistantMatch = block.match(/^## Assistant\n([\s\S]+)/);
+    const userMatch = block.match(/^## User(?:\s*\[.*?\])?\n([\s\S]+)/);
+    const assistantMatch = block.match(/^## Assistant(?:\s*\[.*?\])?\n([\s\S]+)/);
     if (userMatch) {
       messages.push({ id: `msg-${idx++}`, role: 'user', parts: [{ type: 'text', text: userMatch[1].trim() }] });
     } else if (assistantMatch) {
