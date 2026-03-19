@@ -1,11 +1,22 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { saveNode } from './storage';
-import { openai } from '@ai-sdk/openai';
+
+function resolveModel() {
+  if (process.env.OPENAI_API_KEY) {
+    const { openai } = require('@ai-sdk/openai');
+    return openai('gpt-4o-mini');
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    const { anthropic } = require('@ai-sdk/anthropic');
+    return anthropic('claude-haiku-4-5-20251001');
+  }
+  throw new Error('No LLM API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.');
+}
 
 export const extractAndSaveEntities = async (username: string, userMessage: string, messageId: string) => {
   const { object } = await generateObject({
-    model: openai('gpt-4o-mini'),
+    model: resolveModel(),
     schema: z.object({
       entities: z.array(z.object({
         title: z.string(),
