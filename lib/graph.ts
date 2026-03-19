@@ -1,31 +1,30 @@
 import { getAllNodes } from './storage';
 
 export interface GraphNode {
-    id: string;
-    label: string;
-    content: string;
-    neighbors: string[]; // Other nodes mentioned in this node
+  id: string;
+  label: string;
+  content: string;
+  neighbors: string[];
 }
 
-export const getKnowledgeGraph = (): GraphNode[] => {
-    const rawNodes = getAllNodes();
+export const getKnowledgeGraph = (username: string): GraphNode[] => {
+  const rawNodes = getAllNodes(username);
 
-    return rawNodes.map(node => {
-        const content = node.content;
-        // Extract Obsidian-style links: [[Node Name]]
-        const matches = [...content.matchAll(/\[\[(.*?)\]\]/g)];
-        const links = matches.map(m => m[1]);
+  return rawNodes.map(node => {
+    const content = node.content;
+    const matches = [...content.matchAll(/\[\[(.*?)\]\]/g)];
+    const links = matches.map(m => m[1]);
 
-        return {
-            id: node.data.id || node.data.title,
-            label: node.data.title,
-            content: content.substring(0, 500), // Keep memory lightweight
-            neighbors: links
-        };
-    });
+    return {
+      id: node.data.id || node.data.title,
+      label: node.data.title,
+      content: content.substring(0, 500),
+      neighbors: links
+    };
+  });
 };
 
-export const getContextString = (): string => {
-    const graph = getKnowledgeGraph();
-    return graph.map(g => `Entity: ${g.label}\nRelations: ${g.neighbors.join(', ')}\nDetails: ${g.content}`).join('\n\n');
+export const getContextString = (username: string): string => {
+  const graph = getKnowledgeGraph(username);
+  return graph.map(g => `Entity: ${g.label}\nRelations: ${g.neighbors.join(', ')}\nDetails: ${g.content}`).join('\n\n');
 };

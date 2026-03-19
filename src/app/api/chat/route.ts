@@ -1,8 +1,10 @@
 import { streamText, createUIMessageStream, createUIMessageStreamResponse, convertToModelMessages } from 'ai';
 import type { UIMessage, LanguageModel } from 'ai';
-import { getContextString } from '../../../../lib/graph';
-import { extractAndSaveEntities } from '../../../../lib/extractor';
-import { appendToChatLog } from '../../../../lib/storage';
+import { getContextString } from '@/lib/graph';
+import { extractAndSaveEntities } from '@/lib/extractor';
+import { appendToChatLog } from '@/lib/storage';
+
+const SLIDING_WINDOW = 25;
 
 function resolveModel(): LanguageModel {
   if (process.env.OPENAI_API_KEY) {
@@ -19,31 +21,37 @@ function resolveModel(): LanguageModel {
 export async function POST(req: Request) {
   const body = await req.json();
   const messages: UIMessage[] = body.messages ?? [];
-  const sessionId: string = body.sessionId || 'default';
+  const username: string = body.username || 'default';
+  const sessionId: string = body.sessionId || username;
 
-  // Extract the latest user message text
+  // Extract text from the latest user message
   const lastMsg = messages.at(-1);
   const userText =
     (lastMsg?.parts as Array<{ type: string; text?: string }> | undefined)
       ?.find(p => p.type === 'text')?.text ?? '';
+  const messageId = lastMsg?.id ?? `msg_${Date.now()}`;
 
-  // Persist entities and user message to vault
-  await extractAndSaveEntities(userText);
-  appendToChatLog(sessionId, `## User\n${userText}`);
+  // Persist user message and extract entities (non-blocking on failure)
+  appendToChatLog(username, sessionId, `## User\n${userText}`);
+  extractAndSaveEntities(username, userText, messageId).catch(e =>
+    console.error('Entity extraction failed:', e)
+  );
 
-  // Build system prompt enriched with current knowledge graph
-  const context = getContextString();
+  // Build system prompt with knowledge graph context
+  const context = getContextString(username);
   // ✏️ Edit this to change the assistant's behaviour
   const basePrompt =
     'You are a casual, sharp chat assistant. Reply like a human in a chat — short, direct, no fluff. ' +
-    'Never explain things the user didn\'t ask about. No emojis unless the user uses them first. ' +
-    'Match the user\'s energy and brevity.';
+    "Never explain things the user didn't ask about. No emojis unless the user uses them first. " +
+    "Match the user's energy and brevity.";
 
   const system = context
     ? `${basePrompt}\n\n## Knowledge Graph\n${context}`
     : basePrompt;
 
-  const modelMessages = await convertToModelMessages(messages);
+  // Enforce 25-message sliding window before sending to LLM
+  const windowedMessages = messages.slice(-SLIDING_WINDOW);
+  const modelMessages = await convertToModelMessages(windowedMessages);
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -52,7 +60,7 @@ export async function POST(req: Request) {
         system,
         messages: modelMessages,
         onFinish: ({ text }) => {
-          appendToChatLog(sessionId, `## Assistant\n${text}`);
+          appendToChatLog(username, sessionId, `## Assistant\n${text}`);
         },
       });
       writer.merge(result.toUIMessageStream());

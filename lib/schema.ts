@@ -6,6 +6,8 @@ export const NodeFrontmatterSchema = z.object({
     title: z.string(),
     type: z.enum(["person", "concept", "event", "location", "unknown"]),
     tags: z.array(z.string()).default([]),
+    source_context: z.string().optional(),
+    source_message_id: z.string().optional(),
     created_at: z.string(),
     updated_at: z.string(),
 });
