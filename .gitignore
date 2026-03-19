@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local knowledge vault
+/vault
+
 # debug
 npm-debug.log*
 yarn-debug.log*
